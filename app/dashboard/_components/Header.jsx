@@ -15,7 +15,7 @@ function Header() {
     return (
         <div className='flex p-4 items-center justify-between bg-secondary shadow-sm'>
             {/* Logo on the left */}
-            <span className='text-2xl font-bold'>TriviaPlannerGPT</span>
+            <span className='text-2xl font-bold'>TripPlannerGPT</span>
 
             {/* Right-aligned header Menu items */}
             <ul className='flex gap-6 ml-auto'>
