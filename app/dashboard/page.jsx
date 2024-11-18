@@ -277,13 +277,6 @@ const TripPlannerDashboard = () => {
             </Alert>
           )}
 
-          {isLoading && (
-            <Alert>
-              <AlertDescription>
-                Generating your trip plan... This may take a few moments.
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="grid grid-cols-1 gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -465,6 +458,13 @@ const TripPlannerDashboard = () => {
                 'Generate Trip Plan'
               )}
             </Button>
+            {isLoading && (
+            <Alert>
+              <AlertDescription>
+                Generating your trip plan... This may take a few moments.
+              </AlertDescription>
+            </Alert>
+          )}
           </div>
         </div>
       ) : (

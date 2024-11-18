@@ -1,4 +1,3 @@
-// app/api/generate-trip/route.js
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
 
@@ -6,93 +5,58 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-export async function POST(request) {
-  console.log('API route hit: /api/generate-trip');
-  
-  if (!process.env.OPENAI_API_KEY) {
-    console.error('OpenAI API key is missing');
-    return NextResponse.json(
-      { error: 'OpenAI API key is not configured' },
-      { status: 500 }
-    );
-  }
+const SYSTEM_PROMPT = `You are a travel planning assistant that always responds with valid JSON data that exactly matches the specified structure.`;
 
-  try {
-    const body = await request.json();
-    console.log('Received request body:', body);
-
-    const { destination, days, budget, travelWith } = body;
-
-    // Validate required fields
-    if (!destination || !days || !budget || !travelWith) {
-      const missingFields = [];
-      if (!destination) missingFields.push('destination');
-      if (!days) missingFields.push('days');
-      if (!budget) missingFields.push('budget');
-      if (!travelWith) missingFields.push('travelWith');
-      
-      return NextResponse.json(
-        { 
-          error: 'Missing required fields', 
-          details: `Missing: ${missingFields.join(', ')}` 
-        },
-        { status: 400 }
-      );
-    }
-
-    const systemPrompt = `You are a travel planning assistant that always responds with valid JSON data. Your responses should strictly follow the provided JSON structure and include realistic details for hotels, activities, and restaurants.`;
-
-    const userPrompt = `Create a detailed ${days}-day travel itinerary for ${destination} for a ${travelWith} traveler with a ${budget} budget.
-    
-Your response must be a valid JSON object with the following structure:
+const createUserPrompt = (destination, days, budget, travelWith) => `Create a ${days}-day travel itinerary for ${destination} (${travelWith}, ${budget} budget).
+The response MUST strictly follow this exact JSON structure:
 
 {
   "hotels": [
     {
       "name": "Hotel name",
-      "address": "Full hotel address",
+      "address": "Hotel address",
       "pricePerNight": "Price in USD",
-      "imageUrl": "URL to hotel image",
+      "imageUrl": "/api/placeholder/800/600",
       "coordinates": {
-        "latitude": "Latitude",
-        "longitude": "Longitude"
+        "latitude": "lat",
+        "longitude": "long"
       },
-      "rating": "Rating out of 5",
-      "description": "Brief hotel description",
-      "amenities": ["List", "of", "key", "amenities"]
+      "rating": "Rating /5",
+      "description": "Brief description",
+      "amenities": ["amenity1", "amenity2"]
     }
   ],
   "itinerary": {
     "destination": "${destination}",
     "numberOfDays": ${days},
-    "bestTimeToVisit": "Best season/months to visit",
+    "bestTimeToVisit": "Best time to visit",
     "dailyPlans": [
       {
         "day": 1,
         "activities": [
           {
-            "time": "Time slot (e.g., '09:00 AM')",
-            "placeName": "Name of the place/activity",
-            "placeDetails": "Detailed description",
-            "placeImageUrl": "URL to place image",
+            "time": "Time (e.g., 09:00 AM)",
+            "placeName": "Place name",
+            "placeDetails": "Brief details",
+            "placeImageUrl": "/api/placeholder/800/600",
             "coordinates": {
-              "latitude": "Latitude",
-              "longitude": "Longitude"
+              "latitude": "lat",
+              "longitude": "long"
             },
-            "ticketPrice": "Price in USD or 'Free'",
-            "duration": "Estimated duration",
-            "tips": "Local tips or recommendations"
+            "ticketPrice": "Price in USD or Free",
+            "duration": "Duration",
+            "tips": "Brief tip"
           }
         ],
         "meals": [
           {
             "type": "breakfast/lunch/dinner",
-            "restaurantName": "Name of restaurant",
-            "cuisine": "Type of cuisine",
-            "priceRange": "Price range in USD",
+            "restaurantName": "Restaurant name",
+            "cuisine": "Cuisine type",
+            "priceRange": "Price in USD",
             "coordinates": {
-              "latitude": "Latitude",
-              "longitude": "Longitude"
+              "latitude": "lat",
+              "longitude": "long"
             }
           }
         ]
@@ -102,86 +66,81 @@ Your response must be a valid JSON object with the following structure:
 }
 
 Requirements:
-1. Suggest 3-4 hotels matching the ${budget} budget level
-2. Each day should have 3-4 activities
-3. itinerary should consist of ${days}-days
-3. Include all three meals each day
-4. All prices should be in USD
-5. All coordinates should be actual geographical coordinates
-6. All suggested places should be real and actually located in ${destination}
-7. For image URLs, use placeholder image URLs in the format: "/api/placeholder/800/600"`;
+1. Include exactly three hotels
+2. Each day must have exactly three activities
+3. Each day must have exactly three meals
+4. All image URLs must be "/api/placeholder/800/600"
+5. Keep all text descriptions under 100 characters
+6. All coordinates must be provided
+7. All prices must be in USD format`;
 
-    console.log('Sending request to OpenAI');
+export async function POST(request) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'OpenAI API key is not configured' },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const { destination, days, budget, travelWith } = body;
+
+    if (!destination || !days || !budget || !travelWith) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
     const completion = await openai.chat.completions.create({
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: createUserPrompt(destination, days, budget, travelWith) }
       ],
-      model: "gpt-4",
-      temperature: 0.7,
-      max_tokens: 4500
+      model: "gpt-3.5-turbo-1106",
+      temperature: 0.5,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
     });
 
-    console.log('Received response from OpenAI');
-
-    if (!completion.choices?.[0]?.message?.content) {
-      console.error('No content in OpenAI response');
+    const content = completion.choices?.[0]?.message?.content;
+    if (!content) {
       throw new Error('No response content from OpenAI');
     }
 
-    try {
-      // Parse the JSON response
-      const tripPlan = JSON.parse(completion.choices[0].message.content);
-      console.log(tripPlan);
-      console.log('Successfully generated trip plan');
+    // Parse the response
+    const tripPlan = JSON.parse(content);
 
-      // Validate the response structure
-      if (!tripPlan.hotels || !tripPlan.itinerary || !tripPlan.itinerary.dailyPlans) {
-        throw new Error('Invalid response structure from AI');
-      }
-
-      return NextResponse.json(tripPlan);
-    } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      return NextResponse.json(
-        { 
-          error: 'Failed to parse AI response', 
-          details: parseError.message 
-        },
-        { status: 500 }
-      );
+    // Validate the essential structure
+    if (!tripPlan.hotels || !Array.isArray(tripPlan.hotels) || 
+        !tripPlan.itinerary || !tripPlan.itinerary.dailyPlans || 
+        !Array.isArray(tripPlan.itinerary.dailyPlans)) {
+      throw new Error('Invalid response structure from AI');
     }
+
+    // Validate each day has required structure
+    tripPlan.itinerary.dailyPlans.forEach((day, index) => {
+      if (!day.activities || !Array.isArray(day.activities) ||
+          !day.meals || !Array.isArray(day.meals)) {
+        throw new Error(`Invalid structure for day ${index + 1}`);
+      }
+    });
+
+    return NextResponse.json(tripPlan);
 
   } catch (error) {
-    console.error('Error in generate-trip API route:', error);
-    
-    if (error.code === 'insufficient_quota') {
-      return NextResponse.json(
-        { error: 'OpenAI API quota exceeded' },
-        { status: 429 }
-      );
-    }
-
-    if (error.code === 'rate_limit_exceeded') {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429 }
-      );
-    }
-
-    if (error.response?.status === 401) {
-      return NextResponse.json(
-        { error: 'Invalid OpenAI API key' },
-        { status: 401 }
-      );
-    }
+    const status = 
+      error.code === 'insufficient_quota' || error.code === 'rate_limit_exceeded' ? 429 :
+      error.response?.status === 401 ? 401 : 500;
 
     return NextResponse.json(
       { 
         error: 'Failed to generate trip plan', 
-        details: error.message 
+        details: error.message,
+        source: 'API route error handler'
       },
-      { status: 500 }
+      { status }
     );
   }
 }
