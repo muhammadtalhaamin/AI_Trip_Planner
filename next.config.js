@@ -3,7 +3,14 @@ const path = require('path');
 
 module.exports = {
   images: {
-    domains: ['metaschool.so'], // Allow images from this domain
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'metaschool.so', // Allow images from this domain
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
   webpack: (config, { isServer }) => {
     // Adjust Webpack's caching settings to avoid the large serialized string issue

@@ -7,7 +7,7 @@ const openai = new OpenAI({
 
 const SYSTEM_PROMPT = `You are a travel planning assistant that always responds with valid JSON data that exactly matches the specified structure.`;
 
-const createUserPrompt = (destination, days, budget, travelWith) => `Create a ${days}-day travel itinerary for ${destination} (${travelWith}, ${budget} budget).
+const createUserPrompt = (destination, days, budget, travelWith) => `Create a ${days}-day travel itinerary for ${destination}, (${travelWith}, ${budget} budget).
 The response MUST strictly follow this exact JSON structure:
 
 {
@@ -21,7 +21,7 @@ The response MUST strictly follow this exact JSON structure:
         "latitude": "lat",
         "longitude": "long"
       },
-      "rating": "Rating /5",
+      "rating": "Rating out of 5",
       "description": "Brief description",
       "amenities": ["amenity1", "amenity2"]
     }
@@ -72,7 +72,7 @@ Requirements:
 4. All image URLs must be "/api/placeholder/800/600"
 5. Keep all text descriptions under 100 characters
 6. All coordinates must be provided
-7. All prices must be in USD format`;
+7. All prices must be in USD`;
 
 export async function POST(request) {
   if (!process.env.OPENAI_API_KEY) {
@@ -98,9 +98,9 @@ export async function POST(request) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: createUserPrompt(destination, days, budget, travelWith) }
       ],
-      model: "gpt-3.5-turbo-1106",
+      model: "gpt-4o",
       temperature: 0.5,
-      max_tokens: 2000,
+      max_tokens: 1000,
       response_format: { type: "json_object" }
     });
 

@@ -61,6 +61,13 @@ const TripPlannerDashboard = () => {
     setIsLoading(true);
     setError(null);
 
+    // Add a validation check to restrict the maximum number of days to 3
+    if (days > 1) {
+      setError('Maximum duration limit is set to "1" in your plan. Please upgrade your plan to generate multiple days iternary.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/generate-trip', {
         method: 'POST',
@@ -117,11 +124,16 @@ const TripPlannerDashboard = () => {
 
   const downloadTripPlanAsPDF = async () => {
     const input = document.getElementById('trip-plan');
-
+    const buttons = document.querySelectorAll('.no-pdf'); // Add a class to the buttons to exclude them
+  
     try {
+      // Hide the buttons
+      buttons.forEach(button => button.style.display = 'none');
+  
+      // Ensure all images are fully loaded
       let images = input.getElementsByTagName('img');
       let imagesArr = Array.from(images);
-
+  
       await Promise.all(imagesArr.map(img => 
         new Promise((resolve) => {
           if (img.complete) {
@@ -132,33 +144,37 @@ const TripPlannerDashboard = () => {
           }
         })
       ));
-
-      const canvas = await html2canvas(input, { scale: 2 });
+  
+      // Capture the HTML content as a canvas with higher quality
+      const canvas = await html2canvas(input, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-
+  
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
+  
       let heightLeft = pdfHeight;
       let position = 0;
-
+  
       pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
       heightLeft -= pdf.internal.pageSize.getHeight();
-
+  
       while (heightLeft >= 0) {
         position = heightLeft - pdfHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
-
+  
+      // Show the buttons again
+      buttons.forEach(button => button.style.display = '');
+  
       pdf.save(`trip-plan-${destination.replace(/\s+/g, '-')}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
     }
   };
-
+  
   const TripPlanDisplay = ({ plan }) => (
     <div className="space-y-8" id="trip-plan">
       <section className="bg-white p-6 rounded-lg shadow-sm">
@@ -166,7 +182,10 @@ const TripPlannerDashboard = () => {
         <h2 className="text-2xl font-bold mb-4">Recommended Hotels</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {plan.hotels.map((hotel, index) => (
-            <Card key={index} className="overflow-hidden">
+            <Card key={index} className="overflow-hidden cursor-pointer" onClick={() => {
+              const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${hotel.coordinates.latitude},${hotel.coordinates.longitude}`;
+              window.open(googleMapsUrl, '_blank');
+            }}>
               <img src={hotelImages[index] || 'https://picsum.photos/400/200?random'} alt={hotel.name} className="w-full h-48 object-cover" />
               <CardContent className="p-4">
                 <h3 className="font-semibold text-lg">{hotel.name}</h3>
@@ -185,7 +204,7 @@ const TripPlannerDashboard = () => {
           ))}
         </div>
       </section>
-
+  
       <section className="bg-white p-6 rounded-lg shadow-sm">
         <h2 className="text-2xl font-bold mb-4">Daily Itinerary</h2>
         <p className="text-gray-600 mb-6">
@@ -197,7 +216,10 @@ const TripPlannerDashboard = () => {
               <h3 className="text-xl font-semibold mb-4">Day {day.day}</h3>
               <div className="space-y-4">
                 {day.activities.map((activity, actIndex) => (
-                  <Card key={actIndex} className="p-4">
+                  <Card key={actIndex} className="p-4 cursor-pointer" onClick={() => {
+                    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${activity.coordinates.latitude},${activity.coordinates.longitude}`;
+                    window.open(googleMapsUrl, '_blank');
+                  }}>
                     <div className="flex flex-col md:flex-row gap-4">
                       <img
                         src={activityImages[`${dayIndex}-${actIndex}`] || 'https://picsum.photos/400/200?random'}
@@ -237,7 +259,10 @@ const TripPlannerDashboard = () => {
                 <h4 className="font-semibold mb-2">Meals</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {day.meals.map((meal, mealIndex) => (
-                    <Card key={mealIndex} className="p-4">
+                    <Card key={mealIndex} className="p-4 cursor-pointer" onClick={() => {
+                      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${meal.coordinates.latitude},${meal.coordinates.longitude}`;
+                      window.open(googleMapsUrl, '_blank');
+                    }}>
                       <h5 className="font-semibold capitalize">{meal.type}</h5>
                       <p className="text-sm font-medium">{meal.restaurantName}</p>
                       <p className="text-sm text-gray-600">{meal.cuisine}</p>
@@ -250,7 +275,7 @@ const TripPlannerDashboard = () => {
           ))}
         </div>
       </section>
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-2 mt-4 no-pdf">
         <Button onClick={() => setViewTripPlan(false)}>
           Go Back
         </Button>
@@ -260,6 +285,8 @@ const TripPlannerDashboard = () => {
       </div>
     </div>
   );
+
+
 
   return (
     <div className="max-w-5xl mx-auto p-6 bg-gray-50">
